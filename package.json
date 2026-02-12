@@ -1,6 +1,6 @@
 {
   "name": "cvgenius-pro",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "AI-Powered Resume Builder with ATS Testing, Subscriptions, and Premium Features",
   "main": "server.js",
   "scripts": {
@@ -32,7 +32,8 @@
     "dotenv": "^16.3.1",
     "stripe": "^12.0.0",
     "nodemailer": "^6.9.6",
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "@anthropic-ai/sdk": "^1.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
