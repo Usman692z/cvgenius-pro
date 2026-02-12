@@ -1,20 +1,28 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const { Pool } = require("pg");
-const Anthropic = require("@anthropic-ai/sdk");
+// ==========================
+// IMPORTS (ES Module Syntax)
+// ==========================
+import dotenv from "dotenv";
+dotenv.config();
 
+import express from "express";
+import cors from "cors";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import pkg from "pg";
+const { Pool } = pkg;
+import Anthropic from "@anthropic-ai/sdk";
+
+// ==========================
+// INIT
+// ==========================
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static("public"));
 
-/* ===========================
-   DATABASE CONNECTION
-=========================== */
-
+// ==========================
+// DATABASE CONNECTION
+// ==========================
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -22,10 +30,9 @@ const pool = new Pool({
   },
 });
 
-/* ===========================
-   CREATE TABLES
-=========================== */
-
+// ==========================
+// CREATE TABLES
+// ==========================
 async function initializeDatabase() {
   try {
     await pool.query(`
@@ -53,10 +60,9 @@ async function initializeDatabase() {
   }
 }
 
-/* ===========================
-   AUTH MIDDLEWARE
-=========================== */
-
+// ==========================
+// AUTH MIDDLEWARE
+// ==========================
 function authenticateToken(req, res, next) {
   const token = req.headers["authorization"];
   if (!token) return res.status(401).json({ message: "Access denied" });
@@ -68,16 +74,14 @@ function authenticateToken(req, res, next) {
   });
 }
 
-/* ===========================
-   AUTH ROUTES
-=========================== */
-
+// ==========================
+// AUTH ROUTES
+// ==========================
 app.post("/api/auth/register", async (req, res) => {
   const { email, password } = req.body;
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const result = await pool.query(
       "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id",
       [email, hashedPassword]
@@ -101,7 +105,6 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(400).json({ message: "User not found" });
 
   const user = result.rows[0];
-
   const validPassword = await bcrypt.compare(password, user.password);
   if (!validPassword)
     return res.status(400).json({ message: "Invalid password" });
@@ -115,10 +118,9 @@ app.post("/api/auth/login", async (req, res) => {
   res.json({ token });
 });
 
-/* ===========================
-   RESUME ROUTES
-=========================== */
-
+// ==========================
+// RESUME ROUTES
+// ==========================
 app.post("/api/resumes", authenticateToken, async (req, res) => {
   const { title, content } = req.body;
 
@@ -139,10 +141,9 @@ app.get("/api/resumes", authenticateToken, async (req, res) => {
   res.json(result.rows);
 });
 
-/* ===========================
-   AI ROUTE (Anthropic)
-=========================== */
-
+// ==========================
+// AI ROUTE (Anthropic)
+// ==========================
 if (process.env.ANTHROPIC_API_KEY) {
   const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
@@ -152,31 +153,29 @@ if (process.env.ANTHROPIC_API_KEY) {
     const { prompt } = req.body;
 
     try {
-      const response = await anthropic.messages.create({
-        model: "claude-3-haiku-20240307",
-        max_tokens: 300,
-        messages: [{ role: "user", content: prompt }],
+      const response = await anthropic.completions.create({
+        model: "claude-3",
+        prompt: prompt,
+        max_tokens_to_sample: 300,
       });
 
-      res.json({ suggestion: response.content[0].text });
+      res.json({ suggestion: response.completion });
     } catch (err) {
       res.status(500).json({ error: "AI request failed" });
     }
   });
 }
 
-/* ===========================
-   HEALTH CHECK
-=========================== */
-
+// ==========================
+// HEALTH CHECK
+// ==========================
 app.get("/", (req, res) => {
   res.send("🚀 CVGenius API Running Successfully");
 });
 
-/* ===========================
-   START SERVER
-=========================== */
-
+// ==========================
+// START SERVER
+// ==========================
 const PORT = process.env.PORT || 3000;
 
 initializeDatabase().then(() => {
