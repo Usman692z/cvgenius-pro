@@ -1,16 +1,16 @@
 // ==========================
-// IMPORTS (ES Module Syntax)
+// IMPORTS (ES MODULES)
 // ==========================
 import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
 import cors from "cors";
-import bcrypt from "bcryptjs";
+import argon2 from "argon2";
 import jwt from "jsonwebtoken";
-import pkg from "pg";
-const { Pool } = pkg;
+import { Pool } from "pg";
 import Anthropic from "@anthropic-ai/sdk";
+import Stripe from "stripe";
 
 // ==========================
 // INIT
@@ -25,13 +25,16 @@ app.use(express.static("public"));
 // ==========================
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: { rejectUnauthorized: false },
 });
 
 // ==========================
-// CREATE TABLES
+// STRIPE INIT
+// ==========================
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// ==========================
+// DATABASE SETUP
 // ==========================
 async function initializeDatabase() {
   try {
@@ -79,14 +82,12 @@ function authenticateToken(req, res, next) {
 // ==========================
 app.post("/api/auth/register", async (req, res) => {
   const { email, password } = req.body;
-
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await argon2.hash(password);
     const result = await pool.query(
       "INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id",
       [email, hashedPassword]
     );
-
     res.json({ message: "User created", userId: result.rows[0].id });
   } catch (err) {
     res.status(400).json({ error: "Email already exists" });
@@ -95,7 +96,6 @@ app.post("/api/auth/register", async (req, res) => {
 
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
-
   const result = await pool.query(
     "SELECT * FROM users WHERE email = $1",
     [email]
@@ -105,7 +105,7 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(400).json({ message: "User not found" });
 
   const user = result.rows[0];
-  const validPassword = await bcrypt.compare(password, user.password);
+  const validPassword = await argon2.verify(user.password, password);
   if (!validPassword)
     return res.status(400).json({ message: "Invalid password" });
 
@@ -123,12 +123,10 @@ app.post("/api/auth/login", async (req, res) => {
 // ==========================
 app.post("/api/resumes", authenticateToken, async (req, res) => {
   const { title, content } = req.body;
-
   const result = await pool.query(
     "INSERT INTO resumes (user_id, title, content) VALUES ($1, $2, $3) RETURNING *",
     [req.user.id, title, content]
   );
-
   res.json(result.rows[0]);
 });
 
@@ -137,7 +135,6 @@ app.get("/api/resumes", authenticateToken, async (req, res) => {
     "SELECT * FROM resumes WHERE user_id = $1",
     [req.user.id]
   );
-
   res.json(result.rows);
 });
 
@@ -151,14 +148,12 @@ if (process.env.ANTHROPIC_API_KEY) {
 
   app.post("/api/ai/suggest", async (req, res) => {
     const { prompt } = req.body;
-
     try {
       const response = await anthropic.completions.create({
         model: "claude-3",
         prompt: prompt,
         max_tokens_to_sample: 300,
       });
-
       res.json({ suggestion: response.completion });
     } catch (err) {
       res.status(500).json({ error: "AI request failed" });
@@ -177,7 +172,6 @@ app.get("/", (req, res) => {
 // START SERVER
 // ==========================
 const PORT = process.env.PORT || 3000;
-
 initializeDatabase().then(() => {
   app.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
