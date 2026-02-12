@@ -15,12 +15,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load pricing plans
     loadPricingPlans();
     
-    // Check if user is logged in
+    // ✅ FIXED: Only check auth, don't force modal
     if (authToken) {
         getCurrentUser();
-    } else {
-        showAuthModal();
     }
+    // ❌ REMOVED: showAuthModal() - this was the problem!
+    // Now landing page stays visible for everyone
 
     // Event listeners
     document.getElementById('authToggle').addEventListener('click', showAuthModal);
@@ -150,12 +150,17 @@ async function getCurrentUser() {
             showDashboard();
             loadUserData();
         } else {
+            // ✅ FIXED: Clear invalid token but don't show modal
             localStorage.removeItem('cvg_token');
             authToken = null;
-            showAuthModal();
+            // ❌ REMOVED: showAuthModal();
+            // User stays on landing page with clean state
         }
     } catch (error) {
         console.error('Get user error:', error);
+        // ✅ FIXED: On error, clear token but stay on landing
+        localStorage.removeItem('cvg_token');
+        authToken = null;
     }
 }
 
@@ -167,12 +172,15 @@ function logout(e) {
     currentUser = null;
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('home').style.display = 'block';
-    showAuthModal();
+    // ✅ FIXED: Don't show modal after logout - let user browse freely
+    // ❌ REMOVED: showAuthModal();
 }
 
 // ========== DASHBOARD ==========
 
 function showDashboard() {
+    // ✅ FIXED: Hide landing page when showing dashboard
+    document.getElementById('home').style.display = 'none';
     document.getElementById('dashboard').style.display = 'flex';
 }
 
@@ -241,6 +249,7 @@ async function loadPricingPlans() {
 }
 
 async function selectPlan(planId) {
+    // ✅ This is correct - require login for plan selection
     if (!authToken) {
         showAuthModal();
         return;
@@ -316,6 +325,7 @@ async function loadResumes() {
 }
 
 async function createNewResume() {
+    // ✅ This is correct - require login for creating resume
     if (!authToken) {
         showAuthModal();
         return;
@@ -442,6 +452,7 @@ async function deleteResume(resumeId) {
 // ========== ATS TESTING ==========
 
 async function testATS() {
+    // ✅ This is correct - require login for ATS testing
     if (!authToken) {
         showAuthModal();
         return;
@@ -521,6 +532,7 @@ function displayATSResults(report) {
 // ========== AI SUGGESTIONS ==========
 
 async function getAISuggestions() {
+    // ✅ This is correct - require login for AI suggestions
     if (!authToken) {
         showAuthModal();
         return;
